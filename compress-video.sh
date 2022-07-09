@@ -54,7 +54,7 @@ for videoFile in "${filesArray[@]}"; do
 	fi
 
 	mkdir -p "$currentDir/compressedVideos"
-	compressedFileName="$compPrefix-$originalFileName"
+	compressedFileName="$compPrefix$originalFileName"
 	compressedFilePath="$currentDir/compressedVideos/$compressedFileName"
 
 	echo -e "COMPRESSING TO ${GREEN}'$compressedFilePath'${ENDCOLOR}"
@@ -82,5 +82,5 @@ for videoFile in "${filesArray[@]}"; do
 	fi
 	
 	processedFilesCount=$((processedFilesCount+1))
-	totalCompressedKB=$((totalCompressedKB+compressedFileSize/1024))
+	totalCompressedKB=$(((reducedSize/1024) + totalCompressedKB))
 done

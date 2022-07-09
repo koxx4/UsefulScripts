@@ -2,6 +2,7 @@
 
 shopt -s nullglob
 shopt -s globstar
+shopt -u extglob
 
 RED="\e[31m"
 GREEN="\e[32m"
@@ -20,6 +21,7 @@ fi
 processedFilesCount=1
 filesArray=("$1"**/*."$2")
 filesCount=${#filesArray[@]}
+totalCompressedKB=0
 
 echo -e "FOUND ${GREEN} $filesCount ${ENDCOLOR} videos to process"
 read -n 1 -p "ENTER TO CONTINUE..." "input"
@@ -29,35 +31,38 @@ read -p "PREFIX OF COMPRESSED FILES : " "compPrefix"
 read -n 1 -p "ENTER TO START..." "input"
 
 if [[ -n "$compPrefix" ]]; then
-	$compPrefix="$compPrefix"-
+	$compPrefix="$compPrefix-"
 fi
 
-for videoFile in ${filesArray[*]}; do
-
+for videoFile in "${filesArray[@]}"; do
 	echo '--------------------------------'
-	originalFileSize=$(ls -sd "$videoFile" | awk '{print $1}')
+	echo -e "TOTAL COMPRESSED ${GREEN} $totalCompressedKB ${ENDCOLOR} KB"
+	echo -e "TOTAL COMPRESSED ${GREEN} $((totalCompressedKB/1024)) ${ENDCOLOR} MB"
+	echo "PROGRESS: $processedFilesCount/$filesCount files"
+	echo '--------------------------------'
+
+	originalFileSize=$(ls -s --block-size=1 "$videoFile" | awk '{print $1}')
 	originalFileName="$(basename "$videoFile")"
 	currentDir="$(dirname "$videoFile")"
 	
-		
+	echo -e "PROCESSING FILE ${GREEN}'$originalFileName'${ENDCOLOR} - SIZE $originalFileSize BYTES"
+
 	if [[ originalFileSize -eq 0 ]]; then
-		echo -e "${RED} ORIGINAL FILE SIZE IS 0, ABORTING!"
+		echo -e "${RED} ORIGINAL FILE SIZE IS 0, ABORTING! ${ENDCOLOR}"
+		processedFilesCount=$((processedFilesCount+1))
 		continue
 	fi
 
-	echo "PROGRESS: $processedFilesCount/$filesCount files"
-	echo -e "PROCESSING FILE ${GREEN}'$originalFileName'${ENDCOLOR} - SIZE $originalFileSize BYTES"
-
 	mkdir -p "$currentDir/compressedVideos"
-	compressedFileName="$currentDir/$compPrefix-$originalFileName"
-	compressedFilePath="./compressedVideos/$compressedFileName"
+	compressedFileName="$compPrefix-$originalFileName"
+	compressedFilePath="$currentDir/compressedVideos/$compressedFileName"
 
 	echo -e "COMPRESSING TO ${GREEN}'$compressedFilePath'${ENDCOLOR}"
 	
 	#Actual compression done by ffmpeg
 	ffmpeg -hide_banner -loglevel error -y -i "$videoFile" "$compressedFilePath"
 	
-	compressedFileSize=$(ls -sd "$compressedFilePath" | awk '{print $1}')
+	compressedFileSize=$(ls -s --block-size=1 "$compressedFilePath" | awk '{print $1}')
 	reducedSize=$((originalFileSize-compressedFileSize))
 	reducedPercentage=$((reducedSize*100/originalFileSize))
 	
@@ -67,6 +72,8 @@ for videoFile in ${filesArray[*]}; do
 	if [[ $compressedFileSize -ge $originalFileSize ]]; then
 		echo -e "${RED}COMPRESSION MADE FILE BIGGER, ABORTING...${ENDCOLOR}"
 		rm -f "$compressedFilePath"
+		processedFilesCount=$((processedFilesCount+1))
+		continue
 	else
 		if [[ "$deleteAfterComp" = "y" ]] || [[ "$deleteAfterComp" = "Y" ]]; then
 			echo -e "DELETING ORIGINAL FILE ${GREEN}'$originalFileName'${ENDCOLOR}"
@@ -75,4 +82,5 @@ for videoFile in ${filesArray[*]}; do
 	fi
 	
 	processedFilesCount=$((processedFilesCount+1))
+	totalCompressedKB=$((totalCompressedKB+compressedFileSize/1024))
 done
